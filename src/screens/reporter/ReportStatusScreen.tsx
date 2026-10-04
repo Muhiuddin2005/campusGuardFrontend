@@ -231,17 +231,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: spacing.sm,
   },
   label: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
+    flexShrink: 0,
+    marginRight: spacing.md,
   },
   value: {
     color: colors.text,
     fontSize: fontSize.sm,
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
   },
   divider: {
     height: 1,

@@ -50,8 +50,8 @@ export default function TrackScreen({ navigation }: Props) {
 
         <Text style={styles.label}>Passcode</Text>
         <TextInput
-          style={styles.input}
-          placeholder="Enter your 16-character passcode"
+          style={[styles.input, passcode.length > 0 && styles.inputWithText]}
+          placeholder="16-character passcode"
           placeholderTextColor={colors.textMuted}
           value={passcode}
           onChangeText={(text) => setPasscode(text.toUpperCase())}
@@ -122,13 +122,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    padding: spacing.lg,
+    borderRadius: 12,
+    height: 56,
+    paddingHorizontal: spacing.lg,
     color: colors.text,
+    fontSize: fontSize.md,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+  },
+  inputWithText: {
     fontSize: fontSize.lg,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     letterSpacing: 2,
-    textAlign: 'center',
+    fontWeight: '700',
   },
   charCount: {
     color: colors.textMuted,

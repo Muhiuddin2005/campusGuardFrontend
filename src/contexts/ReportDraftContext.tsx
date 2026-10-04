@@ -13,6 +13,7 @@ type ReportDraftContextType = {
   draft: ReportDraft;
   updateDraft: (updates: Partial<ReportDraft>) => void;
   clearDraft: () => void;
+  setIsPickingMedia: (picking: boolean) => void;
 };
 
 const initialDraft: ReportDraft = {
@@ -27,10 +28,21 @@ const ReportDraftContext = createContext<ReportDraftContextType | undefined>(und
 export function ReportDraftProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<ReportDraft>(initialDraft);
   const appState = useRef(AppState.currentState);
+  const isPickingMedia = useRef(false);
 
-  // Clear draft when app goes to background (security requirement)
+  const setIsPickingMedia = (picking: boolean) => {
+    isPickingMedia.current = picking;
+  };
+
+  // Clear draft when app goes to background (security requirement),
+  // but preserve draft when system image picker/modal is opened
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (isPickingMedia.current) {
+        appState.current = nextAppState;
+        return;
+      }
+
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
         // App is going to background - clear draft for security
         setDraft(initialDraft);
@@ -54,7 +66,7 @@ export function ReportDraftProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ReportDraftContext.Provider value={{ draft, updateDraft, clearDraft }}>
+    <ReportDraftContext.Provider value={{ draft, updateDraft, clearDraft, setIsPickingMedia }}>
       {children}
     </ReportDraftContext.Provider>
   );
