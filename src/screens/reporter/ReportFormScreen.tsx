@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,22 +9,16 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  AppState,
+  Alert,
 } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { AppScreenProps, IncidentCategory } from '../../types';
 import { colors, spacing, fontSize } from '../../theme/colors';
 import { createReport } from '../../api/reports';
-import { uploadFile } from '../../api/fileUpload';
 import { useReportDraft } from '../../contexts/ReportDraftContext';
 
 type Props = AppScreenProps<'ReportForm'>;
-
-type SelectedImage = {
-  uri: string;
-  fileName: string;
-  mimeType: string;
-};
 
 const CATEGORIES: { value: IncidentCategory; label: string }[] = [
   { value: 'RAGGING', label: 'Ragging' },
@@ -38,14 +32,24 @@ const CATEGORIES: { value: IncidentCategory; label: string }[] = [
 export default function ReportFormScreen({ navigation }: Props) {
   const { draft, updateDraft, clearDraft } = useReportDraft();
   const [error, setError] = useState('');
-  const [images, setImages] = useState<SelectedImage[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+
+  // Security: App background-e gele draft muche jabe
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        clearDraft();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [clearDraft]);
 
   const mutation = useMutation({
     mutationFn: createReport,
     onSuccess: (data) => {
       clearDraft();
-      setImages([]);
       navigation.reset({
         index: 0,
         routes: [{ name: 'Passcode', params: { passcode: data.passcode } }],
@@ -57,12 +61,11 @@ export default function ReportFormScreen({ navigation }: Props) {
     },
   });
 
-  const pickImages = async () => {
-    setError('Image attach needs a rebuilt APK (expo-image-picker). Submit the report without images for now.');
-  };
-
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+  const pickImages = () => {
+    Alert.alert(
+      'Native Module Required',
+      'Image picker native module is not compiled into the current development build APK. You can submit the incident report via text right now, or test image attachments after a new APK rebuild.'
+    );
   };
 
   const handleSubmit = async () => {
@@ -78,33 +81,15 @@ export default function ReportFormScreen({ navigation }: Props) {
       return;
     }
 
-    try {
-      setIsUploading(true);
-      
-      // Upload images first
-      const mediaKeys: string[] = [];
-      for (const img of images) {
-        const result = await uploadFile(img.uri, img.fileName, img.mimeType);
-        mediaKeys.push(result.storageKey);
-      }
-
-      setIsUploading(false);
-
-      // Submit report with media keys
-      mutation.mutate({
-        category: draft.category,
-        description: draft.description.trim(),
-        incidentLocation: draft.incidentLocation.trim() || undefined,
-        occurredAt: draft.occurredAt || undefined,
-        mediaKeys: mediaKeys.length > 0 ? mediaKeys : undefined,
-      });
-    } catch (err: any) {
-      setIsUploading(false);
-      setError(err.response?.data?.message || 'Failed to upload images');
-    }
+    mutation.mutate({
+      category: draft.category,
+      description: draft.description.trim(),
+      incidentLocation: draft.incidentLocation?.trim() || undefined,
+      occurredAt: draft.occurredAt || undefined,
+    });
   };
 
-  const isSubmitting = isUploading || mutation.isPending;
+  const isSubmitting = mutation.isPending;
 
   return (
     <KeyboardAvoidingView
@@ -116,7 +101,6 @@ export default function ReportFormScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </Pressable>
@@ -124,7 +108,6 @@ export default function ReportFormScreen({ navigation }: Props) {
         <Text style={styles.title}>Report an Incident</Text>
         <Text style={styles.subtitle}>All fields are anonymous. No personal data is stored.</Text>
 
-        {/* Category Selection */}
         <Text style={styles.label}>Category *</Text>
         <View style={styles.chipRow}>
           {CATEGORIES.map((cat) => (
@@ -148,7 +131,6 @@ export default function ReportFormScreen({ navigation }: Props) {
           ))}
         </View>
 
-        {/* Description */}
         <Text style={styles.label}>Description * (min 20 characters)</Text>
         <TextInput
           style={styles.textArea}
@@ -162,49 +144,25 @@ export default function ReportFormScreen({ navigation }: Props) {
         />
         <Text style={styles.charCount}>{draft.description.length} characters</Text>
 
-        {/* Location (optional) */}
         <Text style={styles.label}>Location (optional)</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g., Hall 5, Library, Cafeteria..."
           placeholderTextColor={colors.textMuted}
-          value={draft.incidentLocation}
+          value={draft.incidentLocation || ''}
           onChangeText={(text) => updateDraft({ incidentLocation: text })}
         />
 
-        {/* Image Picker */}
-        <Text style={styles.label}>Evidence (optional, max 5 images)</Text>
+        <Text style={styles.label}>Evidence (optional)</Text>
         <Pressable
           style={({ pressed }) => [styles.imagePickerButton, pressed && styles.buttonPressed]}
           onPress={pickImages}
-          disabled={images.length >= 5}
         >
-          <Text style={styles.imagePickerText}>
-            {images.length >= 5 ? 'Max images reached' : '+ Add Images'}
-          </Text>
+          <Text style={styles.imagePickerText}>+ Add Images</Text>
         </Pressable>
 
-        {/* Selected Images */}
-        {images.length > 0 && (
-          <View style={styles.imageRow}>
-            {images.map((img, index) => (
-              <View key={index} style={styles.imageContainer}>
-                <Image source={{ uri: img.uri }} style={styles.imageThumbnail} />
-                <Pressable
-                  style={styles.removeImageButton}
-                  onPress={() => removeImage(index)}
-                >
-                  <Text style={styles.removeImageText}>×</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Error Message */}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {/* Submit Button */}
         <Pressable
           style={({ pressed }) => [
             styles.submitButton,
@@ -217,9 +175,7 @@ export default function ReportFormScreen({ navigation }: Props) {
           {isSubmitting ? (
             <View style={styles.submitLoading}>
               <ActivityIndicator color={colors.primaryText} />
-              <Text style={styles.submitButtonText}>
-                {isUploading ? 'Uploading...' : 'Submitting...'}
-              </Text>
+              <Text style={styles.submitButtonText}>Submitting...</Text>
             </View>
           ) : (
             <Text style={styles.submitButtonText}>Submit Report</Text>
@@ -329,37 +285,6 @@ const styles = StyleSheet.create({
   imagePickerText: {
     color: colors.textSecondary,
     fontSize: fontSize.sm,
-  },
-  imageRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  imageContainer: {
-    position: 'relative',
-  },
-  imageThumbnail: {
-    width: 70,
-    height: 70,
-    borderRadius: 8,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.error,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeImageText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 16,
   },
   error: {
     color: colors.error,

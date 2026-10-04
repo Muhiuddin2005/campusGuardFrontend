@@ -9,7 +9,7 @@ export default function PasscodeScreen({ route, navigation }: Props) {
   const { passcode } = route.params;
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
+  const handleCopy = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -42,7 +42,7 @@ export default function PasscodeScreen({ route, navigation }: Props) {
             onPress={handleCopy}
           >
             <Text style={styles.copyButtonText}>
-              {copied ? '✓ Copied!' : 'Copy to Clipboard'}
+              {copied ? '✓ Saved' : 'Copy Passcode'}
             </Text>
           </Pressable>
         </View>
